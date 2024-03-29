@@ -111,11 +111,11 @@ def updateScreen(now, labels):
     Update the matrix screen with time
     """
     for location, ts in now.items():
-        hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].split(':')
+        hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
         # blink the status
         status_tile.hidden = not status_tile.hidden
         # change hours leading 0 to blank
-        if hours[0] == "0":
+        if hours[0] == "O":
             hours = f" {hours[1]}"
         # change label only if there is something to change
         if labels[location].text!=f"{location} {hours}:{minutes}":
