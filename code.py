@@ -117,7 +117,7 @@ def get_color(hour_in):
         hour = int(hour_in)
     if hour in range(6,8):
         return 0x3a2edf #blue
-    elif hour in range(8,17):
+    elif hour in range(8,18):
         return 0x00E000 # green
     elif hour in range(18,23):
         return 0x3a2edf #blue
