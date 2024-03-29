@@ -106,12 +106,30 @@ group.append(status_tile)
 group.append(AQILabel)
 
 display.root_group = group
+
+
+def get_color(hour_in):
+    """ Return color based on hour"""
+    # translate to int. If there is a leading zero, then remove it before translating to decimal
+    if hour_in[0]=="0":
+        hour = int(hour_in[1])
+    else:
+        hour = int(hour_in)
+    if hour in range(6,8):
+        return 0x3a2edf #blue
+    elif hour in range(8,17):
+        return 0x00E000 # green
+    elif hour in range(18,23):
+        return 0x3a2edf #blue
+    else:
+        return 0xf54263 # redish pinkish
 def updateScreen(now, labels):
     """
     Update the matrix screen with time
     """
     for location, ts in now.items():
         hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
+        color = get_color(hours.replace("O","0"))
         # blink the status
         status_tile.hidden = not status_tile.hidden
         # change hours leading 0 to blank
@@ -120,6 +138,8 @@ def updateScreen(now, labels):
         # change label only if there is something to change
         if labels[location].text!=f"{location} {hours}:{minutes}":
             labels[location].text=f"{location} {hours}:{minutes}"
+            labels[location].color = color
+
 
 def updatesensor(): 
     try:
@@ -172,8 +192,8 @@ while True:
         if time.monotonic() - last >= 1:
             last+=1 # advance the clock referebce
             # check if 3am in NYC. If so, turn display off
-            hours=now[list(now)[2]].hour
-            minutes=now[list(now)[2]].minute
+            hours=now["NYC"].hour
+            minutes=now["NYC"].minute
             if hours == 3 and minutes ==0:
                 group.hidden = True
             if hours == 9 and minutes ==0:
@@ -194,7 +214,7 @@ while True:
             # print debug info
 
             for location, ts in now.items():
-                if DEBUG: print(location, now[location].isoformat().split('T')[1].split('.')[0])
+                if DEBUG and ts.second == 0: print(location, now[location].isoformat().split('T')[1].split('.')[0])
             
             # this section handles when to fetch the data from all sites
             second_counter += 1  # advance the overall seconds counter
