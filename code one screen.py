@@ -15,70 +15,38 @@ from adafruit_bitmap_font import bitmap_font
 import terminalio
 import displayio
 from digitalio import DigitalInOut, Direction, Pull
-import rgbmatrix
-import framebufferio
 
 DEBUG=True
 TIME_FETCH_INTERVAL = 20
 ENV_REFRESH_INTERVAL = 1
-
-# setup display
-bit_depth = 2
-base_width = 64
-base_height = 32
-chain_across = 1
-tile_down = 2
-serpentine = True
-
-width = base_width * chain_across
-height = base_height * tile_down
-
-addr_pins = [board.MTX_ADDRA, board.MTX_ADDRB, board.MTX_ADDRC, board.MTX_ADDRD]
-rgb_pins = [
-    board.MTX_R1,
-    board.MTX_G1,
-    board.MTX_B1,
-    board.MTX_R2,
-    board.MTX_G2,
-    board.MTX_B2,
-]
-clock_pin = board.MTX_CLK
-latch_pin = board.MTX_LAT
-oe_pin = board.MTX_OE
-
-displayio.release_displays()
-matrix = rgbmatrix.RGBMatrix(
-                width=width,
-                height=height,
-                bit_depth=bit_depth,
-                rgb_pins=rgb_pins,
-                addr_pins=addr_pins,
-                clock_pin=clock_pin,
-                latch_pin=latch_pin,
-                output_enable_pin=oe_pin,
-                tile=tile_down, serpentine=serpentine,
-            )
-display = framebufferio.FramebufferDisplay(matrix)
 
 #init button
 btn = DigitalInOut(board.BUTTON_UP )
 btn.direction = Direction.INPUT
 btn.pull = Pull.UP
 #setup graphics
-#matrix = Matrix()
-#display = matrix.display
+matrix = Matrix()
+display = matrix.display
+# Set the location
+# text_area.x = 0
+# text_area.y = 4
+font = terminalio.FONT
+font_down = bitmap_font.load_font("/fonts/MartianMono_Condensed-Regular-6px.bdf")
 font_down = bitmap_font.load_font("/fonts/RobotoMono-Regular-5pt.bdf")
 font = bitmap_font.load_font("/fonts/RobotoMono-Regular-7pt.bdf")
 color = 0x0000BF
-# Creat a group to hold all screen elements
+# Show it
 group = displayio.Group()
+
 
 # init temp
 sensor = adafruit_ahtx0.AHTx0(board.I2C())
 
-# init air quality sensor
+# setup air quality sensor
 i2c = board.STEMMA_I2C()
+
 reset_pin = None
+
 pm25 = PM25_I2C(i2c, reset_pin)
 aqdata = pm25.read()
 
@@ -88,43 +56,28 @@ network = Network(status_neopixel=board.NEOPIXEL, debug=True)
 
 # a dict of three locations and their ISO time zone to be displayed
 locations = {
-    "SNG": "Asia/Singapore",
     "DEL": "Asia/Kolkata",
     "JER": "Asia/Jerusalem",
-    "UTC": "UTC",
     "NYC": "America/New_York",
-    "SJC": "America/Los_Angeles",
     }
-# labels to hold the clock text
 labels = {
-    "SNG": label.Label(font, text="SNG 12:55", color=color),
     "DEL": label.Label(font, text="JER 12:55", color=color),
     "JER": label.Label(font, text="DEL 12:55", color=color),
-    "UTC": label.Label(font, text="UTC 12:55", color=color),
     "NYC": label.Label(font, text="NYC 12:55", color=color),
-    "SJC": label.Label(font, text="SJC 12:55", color=color),
  }
 
-#set the position on the screen
-labels['SNG'].x = 0
-labels['SNG'].y = 3
 labels['DEL'].x = 0
-labels['DEL'].y = 3+9
-labels['JER'].x = 0 
-labels['JER'].y = 3+9+9
-labels['UTC'].x = 0
-labels['UTC'].y = 3+9+9+9
+labels['DEL'].y = 3
+labels['JER'].x = 0
+labels['JER'].y = 3+7+1
 labels['NYC'].x = 0
-labels['NYC'].y = 3+9+9+9+9
-labels['SJC'].x = 0
-labels['SJC'].y = 3+9+9+9+9+9
+labels['NYC'].y = 3+14+2
 
-#create the enviormental label
 AQILabel = label.Label(font=font_down, text=" "*20, color=0xdddddd)
 AQILabel.x=0
-AQILabel.y=27+32
+AQILabel.y=27
 
-#setup satus block
+#setup satus
 status = displayio.Bitmap(2,2,3)
 status_palette = displayio.Palette(3)
 status_palette[0] = 0x00ff00
@@ -132,41 +85,36 @@ status_palette[1] = 0xff0000
 status_palette[2] = 0xfffb00
 status_tile = displayio.TileGrid(status, pixel_shader=status_palette)
 def set_status(status, color):
-    """ function to set the status label,
-    colors base on status_pallete:
-    0-Green
-    1-Red
-    2-Yellow
-    """
     status[0,0] = color
     status[1,0] = color
     status[0,1] = color
     status[1,1] = color
-# set initial status 
+
 set_status(status,0)
 status_g = displayio.Group()
+#status_g.append(status_tile)
 status_tile.x=62
 status_tile.hidden = False
 
-# create the graphics layout and apply it to the display
-group.append(labels["SNG"])
+
+
+
 group.append(labels["DEL"])
 group.append(labels["JER"])
-group.append(labels["UTC"])
 group.append(labels["NYC"])
-group.append(labels["SJC"])
 group.append(status_tile)
 group.append(AQILabel)
+
 display.root_group = group
 
 
 def get_color(hour_in):
-    """ Return a color based on hour of the day to show different colors:
-    Green - working hours
-    Blue - non working hours
-    Red/Pink - sleeping hours (11pm to 6am)
-    """
-    hour = int(hour_in)
+    """ Return color based on hour"""
+    # translate to int. If there is a leading zero, then remove it before translating to decimal
+    if hour_in[0]=="0":
+        hour = int(hour_in[1])
+    else:
+        hour = int(hour_in)
     if hour in range(6,8):
         return 0x3a2edf #blue
     elif hour in range(8,18):
@@ -180,27 +128,20 @@ def updateScreen(now, labels):
     Update the matrix screen with time
     """
     for location, ts in now.items():
-        # extract the time, converting 0 to O so the diisplay won't show somethign too similar to 8
         hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
-        # get the color based on daytime. the functions can't cope with O so translate back to 0
         color = get_color(hours.replace("O","0"))
-
         # blink the status
         status_tile.hidden = not status_tile.hidden
-        # change hours leading 0/O to blank
+        # change hours leading 0 to blank
         if hours[0] == "O":
             hours = f" {hours[1]}"
         # change label only if there is something to change
         if labels[location].text!=f"{location} {hours}:{minutes}":
             labels[location].text=f"{location} {hours}:{minutes}"
-        if labels[location].color != color:
             labels[location].color = color
 
 
 def updatesensor(): 
-    """
-    Update sensor data
-    """
     try:
         aqdata = pm25.read()
         pm2 = int(aqdata["pm25 standard"])
@@ -208,8 +149,7 @@ def updatesensor():
         print("Unable to read from PM2.5 sensor, no new data..")
         set_status(status,1)
         pm2=0
-    # update the display
-    AQILabel.text = f"AQI:{pm2} T:{(sensor.temperature*9/5)+32:.0f} H:{sensor.relative_humidity:.0f}"
+    AQILabel.text = f"AQI:{pm2} T:{sensor.temperature:.0f} H:{sensor.relative_humidity:.0f}"
     if DEBUG: print(f"AQI: {pm2} temp: {sensor.temperature} Humidity {sensor.relative_humidity}")
 
 def get_time():
@@ -217,7 +157,6 @@ def get_time():
     set_status(status,2)
     times = {}
     for location, tz in locations.items():
-        # use REST API to get the time at the time zone
         res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
         if res:
             # get the returned timestamp ISO format and add a second
@@ -227,22 +166,24 @@ def get_time():
     set_status(status,0)
     return times
 
-# initial sensor update
 updatesensor()
 # `now` holds the local time for all locations
 now = get_time()
-# display the updated times
-updateScreen(now, labels)
 
+updateScreen(now, labels)
 # second_counter coutns the numebr of seconds so every TIME_FETCH_INTERVAL*60 will trigget network update to time
 second_counter = 0
 env_count = 0 # same as the above , but ust for temp metrics
+
+# pirint initial local times
+for location, ts in now.items():
+    if DEBUG: print(location, now[location].isoformat().split('T')[1].split('.')[0])
 
 # loop
 # last will hold the last read for time to manage how often we refresh the seconds
 last = time.monotonic() # start the clock referebce
 while True:
-    # hide unhide display based on the up button
+    # hide unhide display
     if btn.value == False:
         group.hidden = not group.hidden
 
@@ -257,7 +198,6 @@ while True:
                 group.hidden = True
             if hours == 9 and minutes ==0:
                 group.hidden = False
-
             # if seconds in in 10 to 50 range, adv the seconds by one and copy to all locations so they will be the same
             #otherwise just add 1 second to each (the reason is to allow rolling the minute/hours/days when closer to 60 or right after 01)
             seconds = now[list(now)[0]].second #extract the seconds from the first entry in `now`
@@ -272,29 +212,33 @@ while True:
             #update screen
             updateScreen(now, labels)
             # print debug info
+
             for location, ts in now.items():
                 if DEBUG and ts.second == 0: print(location, now[location].isoformat().split('T')[1].split('.')[0])
             
-            # this section handles when to fetch the time from the internet
+            # this section handles when to fetch the data from all sites
             second_counter += 1  # advance the overall seconds counter
             if second_counter >= TIME_FETCH_INTERVAL * 60:
+                # last = time.monotonic()
                 now = get_time() # refresh the time from the time server
                 second_counter = 0 # reset the seconds counter so we can coutn again to TIME_FETCH_INTERVAL * 60
-            
-            # this section updates the env measurments
             env_count += 1
             if env_count >= ENV_REFRESH_INTERVAL * 60:
+            # co2 = scd4x.CO2
+            # temp = c_to_f(scd4x.temperature)
+            # humidity = scd4x.relative_humidity
                 updatesensor()
                 env_count = 0
-
         # no need to busy loop, enough to check the time every 200 millis 
         time.sleep(0.2)
     except RuntimeError as e:
         print("Error", e)
         set_status(status,1)
+        # todo - show a error signal on the  matric to show a problem
         continue
     except adafruit_requests.OutOfRetries as e:
         # if netowrk isn't avail just try the next hour
+        # todo - set a n indicator to show that time is not in sync
         print("Error retrieveing data", e)
         set_status(status,1)
         continue
