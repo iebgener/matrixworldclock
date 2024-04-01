@@ -126,26 +126,39 @@ AQILabel.y=27+32
 
 #setup satus block
 status = displayio.Bitmap(2,2,3)
-status_palette = displayio.Palette(3)
+status_palette = displayio.Palette(4)
 status_palette[0] = 0x00ff00
 status_palette[1] = 0xff0000
 status_palette[2] = 0xfffb00
+status_palette[3] = 0x000000
 status_tile = displayio.TileGrid(status, pixel_shader=status_palette)
-def set_status(status, color):
+status_color = 0 # set the default color
+def set_status(status, color, seconds):
     """ function to set the status label,
     colors base on status_pallete:
     0-Green
     1-Red
     2-Yellow
+    the seconds will determin how many LED to display
     """
     status[0,0] = color
-    status[1,0] = color
-    status[0,1] = color
-    status[1,1] = color
+    if seconds > 14:
+        status[1,0] = color
+    else:
+        status[1,0] = 3 # black
+    if seconds > 29:
+        status[0,1] = color
+    else:
+        status[0,1] = 3 # black
+    if seconds > 44:
+        status[1,1] = color
+    else:
+        status[1,1] = 3 #black
 # set initial status 
-set_status(status,0)
+set_status(status,0,48)
 status_g = displayio.Group()
-status_tile.x=62
+status_tile.x=54
+status_tile.y=1
 status_tile.hidden = False
 
 # create the graphics layout and apply it to the display
@@ -187,6 +200,8 @@ def updateScreen(now, labels):
 
         # blink the status
         status_tile.hidden = not status_tile.hidden
+        if not status_tile.hidden:
+            set_status(status, status_color, int(seconds.replace("O","0")))
         # change hours leading 0/O to blank
         if hours[0] == "O":
             hours = f" {hours[1]}"
@@ -197,7 +212,7 @@ def updateScreen(now, labels):
             labels[location].color = color
 
 
-def updatesensor(): 
+def updatesensor(seconds): 
     """
     Update sensor data
     """
@@ -206,15 +221,16 @@ def updatesensor():
         pm2 = int(aqdata["pm25 standard"])
     except RuntimeError:
         print("Unable to read from PM2.5 sensor, no new data..")
-        set_status(status,1)
+        status_color = 1
+        set_status(status,status_color,seconds)
         pm2=0
     # update the display
     AQILabel.text = f"AQI:{pm2} T:{(sensor.temperature*9/5)+32:.0f} H:{sensor.relative_humidity:.0f}"
     if DEBUG: print(f"AQI: {pm2} temp: {sensor.temperature} Humidity {sensor.relative_humidity}")
 
-def get_time():
+def get_time(seconds):
     """ get local time information from from the net and return list of (location, time)"""
-    set_status(status,2)
+    set_status(status,2,seconds)
     times = {}
     for location, tz in locations.items():
         # use REST API to get the time at the time zone
@@ -224,13 +240,14 @@ def get_time():
             times[location] = datetime.fromisoformat(res.json()['datetime'])
         else:
             print("Error", res.status_code, res.text)
-    set_status(status,0)
+    status_color = 0
+    set_status(status,status_color,seconds)
     return times
 
 # initial sensor update
-updatesensor()
+updatesensor(45)
 # `now` holds the local time for all locations
-now = get_time()
+now = get_time(45)
 # display the updated times
 updateScreen(now, labels)
 
@@ -278,23 +295,25 @@ while True:
             # this section handles when to fetch the time from the internet
             second_counter += 1  # advance the overall seconds counter
             if second_counter >= TIME_FETCH_INTERVAL * 60:
-                now = get_time() # refresh the time from the time server
+                now = get_time(seconds) # refresh the time from the time server
                 second_counter = 0 # reset the seconds counter so we can coutn again to TIME_FETCH_INTERVAL * 60
             
             # this section updates the env measurments
             env_count += 1
             if env_count >= ENV_REFRESH_INTERVAL * 60:
-                updatesensor()
+                updatesensor(seconds)
                 env_count = 0
 
         # no need to busy loop, enough to check the time every 200 millis 
         time.sleep(0.2)
     except RuntimeError as e:
         print("Error", e)
-        set_status(status,1)
+        status_color = 1
+        set_status(status,status_color,seconds)
         continue
     except adafruit_requests.OutOfRetries as e:
         # if netowrk isn't avail just try the next hour
         print("Error retrieveing data", e)
-        set_status(status,1)
+        status_color = 1
+        set_status(status,status_color,seconds)
         continue
