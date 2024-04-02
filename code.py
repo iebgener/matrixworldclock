@@ -23,40 +23,34 @@ TIME_FETCH_INTERVAL = 20
 ENV_REFRESH_INTERVAL = 1
 
 # setup display
-bit_depth = 2
-base_width = 64
-base_height = 32
-chain_across = 1
-tile_down = 2
-serpentine = True
+# bit_depth = 2
+# base_width = 64
+# base_height = 32
+# chain_across = 1
+# tile_down = 2
 
-width = base_width * chain_across
-height = base_height * tile_down
+# width = base_width * chain_across
+# height = base_height * tile_down
 
-addr_pins = [board.MTX_ADDRA, board.MTX_ADDRB, board.MTX_ADDRC, board.MTX_ADDRD]
-rgb_pins = [
-    board.MTX_R1,
-    board.MTX_G1,
-    board.MTX_B1,
-    board.MTX_R2,
-    board.MTX_G2,
-    board.MTX_B2,
-]
-clock_pin = board.MTX_CLK
-latch_pin = board.MTX_LAT
-oe_pin = board.MTX_OE
 
 displayio.release_displays()
 matrix = rgbmatrix.RGBMatrix(
-                width=width,
-                height=height,
-                bit_depth=bit_depth,
-                rgb_pins=rgb_pins,
-                addr_pins=addr_pins,
-                clock_pin=clock_pin,
-                latch_pin=latch_pin,
-                output_enable_pin=oe_pin,
-                tile=tile_down, serpentine=serpentine,
+                width=64,
+                height=64,
+                bit_depth=2,
+                rgb_pins=[
+                    board.MTX_R1,
+                    board.MTX_G1,
+                    board.MTX_B1,
+                    board.MTX_R2,
+                    board.MTX_G2,
+                    board.MTX_B2,
+                ],
+                addr_pins=[board.MTX_ADDRA, board.MTX_ADDRB, board.MTX_ADDRC, board.MTX_ADDRD],
+                clock_pin=board.MTX_CLK,
+                latch_pin=board.MTX_LAT,
+                output_enable_pin=board.MTX_OE,
+                tile=2, serpentine=True,
             )
 display = framebufferio.FramebufferDisplay(matrix)
 
@@ -67,8 +61,8 @@ btn.pull = Pull.UP
 #setup graphics
 #matrix = Matrix()
 #display = matrix.display
-font_down = bitmap_font.load_font("/fonts/RobotoMono-Regular-5pt.bdf")
-font = bitmap_font.load_font("/fonts/RobotoMono-Regular-7pt.bdf")
+font_down = bitmap_font.load_font("/fonts/RM5pt.bdf")
+font = bitmap_font.load_font("/fonts/RM7pt.bdf")
 color = 0x0000BF
 # Creat a group to hold all screen elements
 group = displayio.Group()
@@ -78,8 +72,7 @@ sensor = adafruit_ahtx0.AHTx0(board.I2C())
 
 # init air quality sensor
 i2c = board.STEMMA_I2C()
-reset_pin = None
-pm25 = PM25_I2C(i2c, reset_pin)
+pm25 = PM25_I2C(i2c, None)
 aqdata = pm25.read()
 
 
@@ -221,13 +214,13 @@ def updatesensor(seconds):
         aqdata = pm25.read()
         pm2 = int(aqdata["pm25 standard"])
     except RuntimeError:
-        print("Unable to read from PM2.5 sensor, no new data..")
+        print("PM2.5 sensor ERR")
         status_color = 1
         set_status(status,status_color,seconds)
         pm2=0
     # update the display
     AQILabel.text = f"AQI:{pm2} T:{(sensor.temperature*9/5)+32:.0f} H:{sensor.relative_humidity:.0f}"
-    if DEBUG: print(f"AQI: {pm2} temp: {sensor.temperature} Humidity {sensor.relative_humidity}")
+    if DEBUG: print(f"AQI: {pm2} T: {sensor.temperature} H: {sensor.relative_humidity}")
 
 def get_time(seconds):
     """ get local time information from from the net and return list of (location, time)"""
@@ -308,13 +301,13 @@ while True:
         # no need to busy loop, enough to check the time every 200 millis 
         time.sleep(0.2)
     except RuntimeError as e:
-        print("Error", e)
+        print("Err", e)
         status_color = 1
         set_status(status,status_color,seconds)
         continue
     except adafruit_requests.OutOfRetries as e:
         # if netowrk isn't avail just try the next hour
-        print("Error retrieveing data", e)
+        print("Err get", e)
         status_color = 1
         set_status(status,status_color,seconds)
         continue
