@@ -18,3 +18,12 @@ Using CirtcuitPython
 - [Matrix Portal](https://learn.adafruit.com/adafruit-matrixportal-m4/overview)
 - [Matrix Chaining](https://learn.adafruit.com/rgb-led-matrices-matrix-panels-with-circuitpython/advanced-multiple-panels)
 - [Display IO](https://learn.adafruit.com/circuitpython-display-support-using-displayio)
+
+## Note
+To connect to WiFi, add a file named `secrets.py` to the root directory with the following content:
+```python
+secrets = {
+        'ssid' : 'SSID',
+        'password' : 'WifiPassword',
+}
+```
