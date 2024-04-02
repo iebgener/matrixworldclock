@@ -229,6 +229,7 @@ def get_time(seconds):
     times = {}
     for location, tz in locations.items():
         # use REST API to get the time at the time zone
+        # free memory before fetching and pring free memory otherwise from time to time we will run out of memory 
         gc.collect()
         print(gc.mem_free())
         res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
