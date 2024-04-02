@@ -102,20 +102,20 @@ labels = {
 labels['SNG'].x = 0
 labels['SNG'].y = 3
 labels['DEL'].x = 0
-labels['DEL'].y = 3+9
+labels['DEL'].y = 12
 labels['JER'].x = 0 
-labels['JER'].y = 3+9+9
+labels['JER'].y = 21
 labels['UTC'].x = 0
-labels['UTC'].y = 3+9+9+9
+labels['UTC'].y = 30
 labels['NYC'].x = 0
-labels['NYC'].y = 3+9+9+9+9
+labels['NYC'].y = 39
 labels['SJC'].x = 0
-labels['SJC'].y = 3+9+9+9+9+9
+labels['SJC'].y = 48
 
 #create the enviormental label
 AQILabel = label.Label(font=font_down, text=" "*20, color=0xdddddd)
 AQILabel.x=0
-AQILabel.y=27+32
+AQILabel.y=59
 
 #setup satus block
 status = displayio.Bitmap(2,2,3)
