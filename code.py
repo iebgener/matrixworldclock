@@ -17,6 +17,7 @@ import displayio
 from digitalio import DigitalInOut, Direction, Pull
 import rgbmatrix
 import framebufferio
+import gc
 
 DEBUG=True
 TIME_FETCH_INTERVAL = 20
@@ -228,6 +229,8 @@ def get_time(seconds):
     times = {}
     for location, tz in locations.items():
         # use REST API to get the time at the time zone
+        gc.collect()
+        print(gc.mem_free())
         res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
         if res:
             # get the returned timestamp ISO format and add a second
