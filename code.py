@@ -196,6 +196,11 @@ def updateScreen(now, labels):
         # extract the time, converting 0 to O so the diisplay won't show somethign too similar to 8
         # hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
         hours=str(now[location].hour).replace("0","O")
+        if len(hours) == 1:
+            hours = "O"+hours
+        minutes=str(now[location].minute).replace("0","O")
+        if len(minutes) == 1:
+            minutes = "O"+minutes
         minutes=str(now[location].minute).replace("0","O")
         seconds=now[location].second
         # get the color based on daytime. the functions can't cope with O so translate back to 0
