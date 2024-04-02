@@ -3,6 +3,9 @@
 Display world clock on a 64 * 64 RGM matrix using two 64*32 matrixes, sync with time source from the Internet.
 Using CirtcuitPython
 
+## Picture
+![](picture1.jpg)
+
 ## material
 - [matrix Portal](https://www.adafruit.com/product/4745)
 - [2 x 64 * 32 LED Matrix](https://www.adafruit.com/product/2278)
