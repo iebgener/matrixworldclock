@@ -3,8 +3,8 @@ import board
 #import microcontroller
 #from digitalio import DigitalInOut, Direction, Pull
 from adafruit_matrixportal.network import Network
-from adafruit_matrixportal.matrix import Matrix
-from adafruit_datetime import datetime, date, timedelta
+#from adafruit_matrixportal.matrix import Matrix
+from adafruit_datetime import datetime,  timedelta
 import adafruit_requests
 #from adafruit_ticks import ticks_ms, ticks_add, ticks_diff
 from adafruit_pm25.i2c import PM25_I2C
@@ -12,7 +12,7 @@ import adafruit_ahtx0
 #from adafruit_matrixportal.matrixportal import MatrixPortal
 from adafruit_display_text import label
 from adafruit_bitmap_font import bitmap_font
-import terminalio
+#import terminalio
 import displayio
 from digitalio import DigitalInOut, Direction, Pull
 import rgbmatrix
@@ -194,14 +194,17 @@ def updateScreen(now, labels):
     """
     for location, ts in now.items():
         # extract the time, converting 0 to O so the diisplay won't show somethign too similar to 8
-        hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
+        # hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
+        hours=str(now[location].hour).replace("0","O")
+        minutes=str(now[location].minute).replace("0","O")
+        seconds=now[location].second
         # get the color based on daytime. the functions can't cope with O so translate back to 0
         color = get_color(hours.replace("O","0"))
 
         # blink the status
         status_tile.hidden = not status_tile.hidden
         if not status_tile.hidden:
-            set_status(status, status_color, int(seconds.replace("O","0")))
+            set_status(status, status_color, seconds)
         # change hours leading 0/O to blank
         if hours[0] == "O":
             hours = f" {hours[1]}"
