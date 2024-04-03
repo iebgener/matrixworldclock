@@ -238,6 +238,7 @@ def get_time(seconds):
             times[location] = datetime.fromisoformat(res.json()['datetime'])
         else:
             print("Error", res.status_code, res.text)
+            raise RuntimeError
     status_color = 0
     set_status(status,status_color,seconds)
     return times
@@ -295,6 +296,7 @@ while True:
             if second_counter >= TIME_FETCH_INTERVAL * 60:
                 now = get_time(seconds) # refresh the time from the time server
                 second_counter = 0 # reset the seconds counter so we can coutn again to TIME_FETCH_INTERVAL * 60
+                status_color = 0 # if we are here it means we are sucessful, so set the status color
             
             # this section updates the env measurments
             env_count += 1
@@ -314,4 +316,5 @@ while True:
         print("Err get", e)
         status_color = 1
         set_status(status,status_color,seconds)
+        second_counter = TIME_FETCH_INTERVAL * 30 # try more often
         continue
