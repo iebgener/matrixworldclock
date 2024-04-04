@@ -1,5 +1,6 @@
 import time
 import board
+from microcontroller import reset
 #import microcontroller
 #from digitalio import DigitalInOut, Direction, Pull
 from adafruit_matrixportal.network import Network
@@ -246,94 +247,91 @@ def get_time(seconds):
         # free memory before fetching and pring free memory otherwise from time to time we will run out of memory 
         gc.collect()
         # print(gc.mem_free())
-        try:
-            res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
-            if res:
-                # get the returned timestamp ISO format and add a second
-                times[location] = datetime.fromisoformat(res.json()['datetime'])
-            else:
-                print("Error", res.status_code, res.text)
-                raise RuntimeError
-        except MemoryError as e:
-            gc.collect()
-            print("Error: memory allocation error")
+        res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
+        if res:
+            # get the returned timestamp ISO format and add a second
+            times[location] = datetime.fromisoformat(res.json()['datetime'])
+        else:
+            print("Error", res.status_code, res.text)
             raise RuntimeError
     status_color = 0
     set_status(status,status_color,seconds)
     return times
+try:
+    # initial sensor update
+    updatesensor(45)
+    # `now` holds the local time for all locations
+    now = get_time(45)
+    # display the updated times
+    updateScreen(now, labels)
 
-# initial sensor update
-updatesensor(45)
-# `now` holds the local time for all locations
-now = get_time(45)
-# display the updated times
-updateScreen(now, labels)
+    # second_counter coutns the numebr of seconds so every TIME_FETCH_INTERVAL*60 will trigget network update to time
+    second_counter = 0
+    env_count = 0 # same as the above , but ust for temp metrics
 
-# second_counter coutns the numebr of seconds so every TIME_FETCH_INTERVAL*60 will trigget network update to time
-second_counter = 0
-env_count = 0 # same as the above , but ust for temp metrics
+    # loop
+    # last will hold the last read for time to manage how often we refresh the seconds
+    last = time.monotonic() # start the clock referebce
+    while True:
+        # hide unhide display based on the up button
+        if btn.value == False:
+            group.hidden = not group.hidden
 
-# loop
-# last will hold the last read for time to manage how often we refresh the seconds
-last = time.monotonic() # start the clock referebce
-while True:
-    # hide unhide display based on the up button
-    if btn.value == False:
-        group.hidden = not group.hidden
+        try:
+            # check if a second past to update the current time, and check if its time to fetch the time from the net 
+            if time.monotonic() - last >= 1:
+                last+=1 # advance the clock referebce
+                # check if 3am in NYC. If so, turn display off
+                hours=now["SJC"].hour
+                minutes=now["SJC"].minute
+                if hours == 0 and minutes ==0:
+                    group.hidden = True
+                if hours == 6 and minutes ==0:
+                    group.hidden = False
 
-    try:
-        # check if a second past to update the current time, and check if its time to fetch the time from the net 
-        if time.monotonic() - last >= 1:
-            last+=1 # advance the clock referebce
-            # check if 3am in NYC. If so, turn display off
-            hours=now["SJC"].hour
-            minutes=now["SJC"].minute
-            if hours == 0 and minutes ==0:
-                group.hidden = True
-            if hours == 6 and minutes ==0:
-                group.hidden = False
-
-            # if seconds in in 10 to 50 range, adv the seconds by one and copy to all locations so they will be the same
-            #otherwise just add 1 second to each (the reason is to allow rolling the minute/hours/days when closer to 60 or right after 01)
-            seconds = now[list(now)[0]].second #extract the seconds from the first entry in `now`
-            seconds+=1 # add a second
-            if seconds in range(10, 50):
+                # if seconds in in 10 to 50 range, adv the seconds by one and copy to all locations so they will be the same
+                #otherwise just add 1 second to each (the reason is to allow rolling the minute/hours/days when closer to 60 or right after 01)
+                seconds = now[list(now)[0]].second #extract the seconds from the first entry in `now`
+                seconds+=1 # add a second
+                if seconds in range(10, 50):
+                    for location, ts in now.items():
+                        now[location] = now[location].replace(second=seconds)
+                else:
+                    for location, ts in now.items():
+                        now[location] += timedelta(seconds = 1)
+                
+                #update screen
+                updateScreen(now, labels)
+                # print debug info
                 for location, ts in now.items():
-                    now[location] = now[location].replace(second=seconds)
-            else:
-                for location, ts in now.items():
-                    now[location] += timedelta(seconds = 1)
-            
-            #update screen
-            updateScreen(now, labels)
-            # print debug info
-            for location, ts in now.items():
-                if DEBUG and ts.second == 0: print(location, now[location].isoformat().split('T')[1].split('.')[0])
-            
-            # this section handles when to fetch the time from the internet
-            second_counter += 1  # advance the overall seconds counter
-            if second_counter >= TIME_FETCH_INTERVAL * 60:
-                now = get_time(seconds) # refresh the time from the time server
-                second_counter = 0 # reset the seconds counter so we can coutn again to TIME_FETCH_INTERVAL * 60
-                status_color = 0 # if we are here it means we are sucessful, so set the status color
-            
-            # this section updates the env measurments
-            env_count += 1
-            if env_count >= ENV_REFRESH_INTERVAL * 60:
-                updatesensor(seconds)
-                env_count = 0
+                    if DEBUG and ts.second == 0: print(location, now[location].isoformat().split('T')[1].split('.')[0])
+                
+                # this section handles when to fetch the time from the internet
+                second_counter += 1  # advance the overall seconds counter
+                if second_counter >= TIME_FETCH_INTERVAL * 60:
+                    now = get_time(seconds) # refresh the time from the time server
+                    second_counter = 0 # reset the seconds counter so we can coutn again to TIME_FETCH_INTERVAL * 60
+                    status_color = 0 # if we are here it means we are sucessful, so set the status color
+                
+                # this section updates the env measurments
+                env_count += 1
+                if env_count >= ENV_REFRESH_INTERVAL * 60:
+                    updatesensor(seconds)
+                    env_count = 0
 
-        # no need to busy loop, enough to check the time every 200 millis 
-        time.sleep(0.2)
-    except RuntimeError as e:
-        print("Err", e)
-        status_color = 1
-        set_status(status,status_color,seconds)
-        continue
-    except OutOfRetries as e:
-        # if netowrk isn't avail just try the next hour
-        print("Err get", e)
-        status_color = 1
-        set_status(status,status_color,seconds)
-        second_counter = TIME_FETCH_INTERVAL * 30 # try more often
-        continue
+            # no need to busy loop, enough to check the time every 200 millis 
+            time.sleep(0.2)
+        except RuntimeError as e:
+            print("Err", e)
+            status_color = 1
+            set_status(status,status_color,seconds)
+            continue
+        except OutOfRetries as e:
+            # if netowrk isn't avail just try the next hour
+            print("Err get", e)
+            status_color = 1
+            set_status(status,status_color,seconds)
+            second_counter = TIME_FETCH_INTERVAL * 30 # try more often
+            continue
+except MemoryError:
+    reset()
