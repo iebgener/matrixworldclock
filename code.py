@@ -5,7 +5,7 @@ import board
 from adafruit_matrixportal.network import Network
 #from adafruit_matrixportal.matrix import Matrix
 from adafruit_datetime import datetime,  timedelta
-import adafruit_requests
+from adafruit_requests import OutOfRetries
 #from adafruit_ticks import ticks_ms, ticks_add, ticks_diff
 from adafruit_pm25.i2c import PM25_I2C
 import adafruit_ahtx0
@@ -18,10 +18,24 @@ from digitalio import DigitalInOut, Direction, Pull
 import rgbmatrix
 import framebufferio
 import gc
+# from audiocore import RawSample
+# from audioio  import AudioOut
+# from array import array
+# from math import sin, pi
 
 DEBUG=True
 TIME_FETCH_INTERVAL = 20
 ENV_REFRESH_INTERVAL = 1
+
+#setup speaker
+# dac = AudioOut(board.A0)
+# length = 8000 // 800
+# sine_wave = array("H", [0] * length)
+# for i in range(length):
+#     sine_wave[i] = int(sin(pi * 2 * i / length) * (2 ** 15) + 2 ** 15)
+
+# sine_wave = RawSample(sine_wave) #, sample_rate=8000)
+# playing = False
 
 # setup display
 # bit_depth = 2
@@ -231,13 +245,18 @@ def get_time(seconds):
         # use REST API to get the time at the time zone
         # free memory before fetching and pring free memory otherwise from time to time we will run out of memory 
         gc.collect()
-        print(gc.mem_free())
-        res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
-        if res:
-            # get the returned timestamp ISO format and add a second
-            times[location] = datetime.fromisoformat(res.json()['datetime'])
-        else:
-            print("Error", res.status_code, res.text)
+        # print(gc.mem_free())
+        try:
+            res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
+            if res:
+                # get the returned timestamp ISO format and add a second
+                times[location] = datetime.fromisoformat(res.json()['datetime'])
+            else:
+                print("Error", res.status_code, res.text)
+                raise RuntimeError
+        except MemoryError as e:
+            gc.collect()
+            print("Error: memory allocation error")
             raise RuntimeError
     status_color = 0
     set_status(status,status_color,seconds)
@@ -267,11 +286,11 @@ while True:
         if time.monotonic() - last >= 1:
             last+=1 # advance the clock referebce
             # check if 3am in NYC. If so, turn display off
-            hours=now["NYC"].hour
-            minutes=now["NYC"].minute
-            if hours == 3 and minutes ==0:
+            hours=now["SJC"].hour
+            minutes=now["SJC"].minute
+            if hours == 0 and minutes ==0:
                 group.hidden = True
-            if hours == 9 and minutes ==0:
+            if hours == 6 and minutes ==0:
                 group.hidden = False
 
             # if seconds in in 10 to 50 range, adv the seconds by one and copy to all locations so they will be the same
@@ -311,7 +330,7 @@ while True:
         status_color = 1
         set_status(status,status_color,seconds)
         continue
-    except adafruit_requests.OutOfRetries as e:
+    except OutOfRetries as e:
         # if netowrk isn't avail just try the next hour
         print("Err get", e)
         status_color = 1
