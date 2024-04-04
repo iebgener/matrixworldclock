@@ -333,5 +333,5 @@ try:
             set_status(status,status_color,seconds)
             second_counter = TIME_FETCH_INTERVAL * 30 # try more often
             continue
-except MemoryError:
+except (MemoryError, TimeoutError):
     reset()
