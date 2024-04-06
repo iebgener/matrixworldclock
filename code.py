@@ -326,7 +326,7 @@ try:
             status_color = 1
             set_status(status,status_color,seconds)
             continue
-        except OutOfRetries as e:
+        except (OutOfRetries, ConnectionError) as e:
             # if netowrk isn't avail just try the next hour
             print("Err get", e)
             status_color = 1
