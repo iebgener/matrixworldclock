@@ -353,18 +353,18 @@ try:
             print("lowering offset")
             delta = calcNewOffset(now['SJC'], "DOWN")  
             now = offsetNow(now, delta) 
+            # reseet within two minutes
+            second_counter = TIME_FETCH_INTERVAL * 60 - 120
             if not offset:
                 offset = True
-                # back to regualr time within 30 seconds
-                second_counter = TIME_FETCH_INTERVAL * 60 - 30
         if not buttons & (1 << BUTTON_A):
             print("addding ofset offset")
             delta = calcNewOffset(now['SJC'], "UP")  
             now = offsetNow(now, delta) 
+            # reseet within two minutes
+            second_counter = TIME_FETCH_INTERVAL * 60 - 120
             if not offset:
                 offset = True
-                # back to regualr time within 30 seconds
-                second_counter = TIME_FETCH_INTERVAL * 60 - 30
 
         # hide unhide display based on the up button
         if btn.value == False:
