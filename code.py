@@ -217,6 +217,7 @@ group.append(status_tile)
 group.append(AQILabel)
 display.root_group = group
 
+display.auto_refresh = False
 
 def get_color(hour_in):
     """ Return a color based on hour of the day to show different colors:
@@ -237,7 +238,6 @@ def updateScreen(now, labels):
     """
     Update the matrix screen with time
     """
-    display.auto_refresh = False
     for location, ts in now.items():
         # extract the time, converting 0 to O so the diisplay won't show somethign too similar to 8
         hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
@@ -258,7 +258,6 @@ def updateScreen(now, labels):
     # blink the status
     status_tile.hidden = not status_tile.hidden
     display.refresh()
-    display.auto_refresh = True
 
 
 def updatesensor(seconds): 
@@ -275,6 +274,7 @@ def updatesensor(seconds):
         pm2=0
     # update the display
     AQILabel.text = f"AQI:{pm2} T:{(sensor.temperature*9/5)+32:.0f} H:{sensor.relative_humidity:.0f}"
+    display.refresh()
     if DEBUG: print(f"AQI: {pm2} T: {sensor.temperature} H: {sensor.relative_humidity}")
 
 def get_time(seconds):
@@ -354,30 +354,35 @@ try:
     # loop
     # last will hold the last read for time to manage how often we refresh the seconds
     last = time.monotonic() # start the clock referebce
+    pre_buttons = seesaw.digital_read_bulk(button_mask)
     while True:
         buttons = seesaw.digital_read_bulk(button_mask)
         pressed = False
-        if not buttons & (1 << BUTTON_START):
-            now = get_time(seconds) # refresh the time from the time server
-            offset = False
-        if not buttons & (1 << BUTTON_Y):
-            delta = calcNewOffset(now['SJC'], "DOWN30")  
-            pressed = True
-        if not buttons & (1 << BUTTON_A):
-            delta = calcNewOffset(now['SJC'], "UP30")  
-            pressed = True
-        if not buttons & (1 << BUTTON_B):
-            delta = calcNewOffset(now['SJC'], "DOWN60")  
-            pressed = True
-        if not buttons & (1 << BUTTON_X):
-            delta = calcNewOffset(now['SJC'], "UP60")  
-            pressed = True
-        if pressed:
-            now = offsetNow(now, delta) 
-            # reseet within two minutes
-            second_counter = TIME_FETCH_INTERVAL * 60 - 120
-            if not offset:
-                offset = True
+        # check for change
+        if pre_buttons != buttons:
+            if not buttons & (1 << BUTTON_START):
+                now = get_time(seconds) # refresh the time from the time server
+                offset = False
+            if not buttons & (1 << BUTTON_Y):
+                delta = calcNewOffset(now['SJC'], "DOWN30")  
+                pressed = True
+            if not buttons & (1 << BUTTON_A):
+                delta = calcNewOffset(now['SJC'], "UP30")  
+                pressed = True
+            if not buttons & (1 << BUTTON_B):
+                delta = calcNewOffset(now['SJC'], "DOWN60")  
+                pressed = True
+            if not buttons & (1 << BUTTON_X):
+                delta = calcNewOffset(now['SJC'], "UP60")  
+                pressed = True
+            if pressed:
+                now = offsetNow(now, delta) 
+                updateScreen(now, labels)
+                # reseet within two minutes
+                second_counter = TIME_FETCH_INTERVAL * 60 - 120
+                if not offset:
+                    offset = True
+        pre_buttons = buttons
 
         # hide unhide display based on the up button
         if btn.value == False:
@@ -426,7 +431,7 @@ try:
                     env_count = 0
 
             # no need to busy loop, enough to check the time every 200 millis 
-            time.sleep(0.1)
+            time.sleep(0.05)
         except RuntimeError as e:
             print("Err", e)
             status_color = 1
