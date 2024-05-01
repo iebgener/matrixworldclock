@@ -54,6 +54,7 @@ button_mask = const(
 seesaw = Seesaw(i2c, addr=0x50)
 
 seesaw.pin_mode_bulk(button_mask, seesaw.INPUT_PULLUP)
+
 #setup speaker
 # dac = AudioOut(board.A0)
 #length = 8000 // 800
@@ -244,8 +245,6 @@ def updateScreen(now, labels):
         # get the color based on daytime. the functions can't cope with O so translate back to 0
         color = get_color(hours.replace("O","0"))
 
-        # blink the status
-        status_tile.hidden = not status_tile.hidden
         if not status_tile.hidden:
             set_status(status, status_color, seconds)
         # change hours leading 0/O to blank
@@ -256,6 +255,8 @@ def updateScreen(now, labels):
             labels[location].text=f"{location} {hours}:{minutes}"
         if labels[location].color != color:
             labels[location].color = color
+    # blink the status
+    status_tile.hidden = not status_tile.hidden
     display.refresh()
     display.auto_refresh = True
 
