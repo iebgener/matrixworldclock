@@ -19,24 +19,50 @@ from digitalio import DigitalInOut, Direction, Pull
 import rgbmatrix
 import framebufferio
 import gc
-# from audiocore import RawSample
-# from audioio  import AudioOut
-# from array import array
-# from math import sin, pi
+from audiocore import RawSample
+#import audioio
+#from audioio  import AudioOut
+#from array import array
+#from math import sin, pi
+from adafruit_seesaw.seesaw import Seesaw
+from micropython import const
 
 DEBUG=True
 TIME_FETCH_INTERVAL = 20
 ENV_REFRESH_INTERVAL = 1
 
+i2c = board.STEMMA_I2C()
+
+# setup joystick
+BUTTON_X = const(6)
+BUTTON_Y = const(2)
+BUTTON_A = const(5)
+BUTTON_B = const(1)
+BUTTON_SELECT = const(0)
+BUTTON_START = const(16)
+button_mask = const(
+    (1 << BUTTON_X)
+    | (1 << BUTTON_Y)
+    | (1 << BUTTON_A)
+    | (1 << BUTTON_B)
+    | (1 << BUTTON_SELECT)
+    | (1 << BUTTON_START)
+)
+
+# i2c_bus = board.I2C()  # Uses board.SCL and board.SDA. Use with breadboard.
+
+seesaw = Seesaw(i2c, addr=0x50)
+
+seesaw.pin_mode_bulk(button_mask, seesaw.INPUT_PULLUP)
 #setup speaker
 # dac = AudioOut(board.A0)
-# length = 8000 // 800
-# sine_wave = array("H", [0] * length)
-# for i in range(length):
-#     sine_wave[i] = int(sin(pi * 2 * i / length) * (2 ** 15) + 2 ** 15)
-
-# sine_wave = RawSample(sine_wave) #, sample_rate=8000)
-# playing = False
+#length = 8000 // 800
+#sine_wave = array("H", [0] * length)
+#for i in range(length):
+#    sine_wave[i] = int(sin(pi * 2 * i / length) * (2 ** 15) + 2 ** 15)
+#
+#sine_wave = RawSample(sine_wave) #, sample_rate=8000)
+#playing = False
 
 # setup display
 # bit_depth = 2
@@ -87,7 +113,6 @@ group = displayio.Group()
 sensor = adafruit_ahtx0.AHTx0(board.I2C())
 
 # init air quality sensor
-i2c = board.STEMMA_I2C()
 pm25 = PM25_I2C(i2c, None)
 aqdata = pm25.read()
 
@@ -97,34 +122,44 @@ network = Network(status_neopixel=board.NEOPIXEL, debug=True)
 
 # a dict of three locations and their ISO time zone to be displayed
 locations = {
-    "SNG": "Asia/Singapore",
     "DEL": "Asia/Kolkata",
     "JER": "Asia/Jerusalem",
     "UTC": "UTC",
     "NYC": "America/New_York",
+    "DAL": "America/Chicago",
     "SJC": "America/Los_Angeles",
     }
+# offset for timezone calculations
+offset = False
+#offset = {
+#    "DEL": 0,
+#    "JER": 0,
+#    "UTC": 0,
+#    "NYC": 0,
+#    "DAL": 0,
+#    "SJC": 0,
+# }
 # labels to hold the clock text
 labels = {
-    "SNG": label.Label(font, text="SNG 12:55", color=color),
     "DEL": label.Label(font, text="JER 12:55", color=color),
     "JER": label.Label(font, text="DEL 12:55", color=color),
     "UTC": label.Label(font, text="UTC 12:55", color=color),
     "NYC": label.Label(font, text="NYC 12:55", color=color),
+    "DAL": label.Label(font, text="DAL 12:55", color=color),
     "SJC": label.Label(font, text="SJC 12:55", color=color),
  }
 
 #set the position on the screen
-labels['SNG'].x = 0
-labels['SNG'].y = 3
 labels['DEL'].x = 0
-labels['DEL'].y = 12
-labels['JER'].x = 0 
-labels['JER'].y = 21
-labels['UTC'].x = 0
-labels['UTC'].y = 30
+labels['DEL'].y = 3
+labels['JER'].x = 0
+labels['JER'].y = 12
+labels['UTC'].x = 0 
+labels['UTC'].y = 21
 labels['NYC'].x = 0
-labels['NYC'].y = 39
+labels['NYC'].y = 30
+labels['DAL'].x = 0
+labels['DAL'].y = 39
 labels['SJC'].x = 0
 labels['SJC'].y = 48
 
@@ -171,11 +206,11 @@ status_tile.y=1
 status_tile.hidden = False
 
 # create the graphics layout and apply it to the display
-group.append(labels["SNG"])
 group.append(labels["DEL"])
 group.append(labels["JER"])
 group.append(labels["UTC"])
 group.append(labels["NYC"])
+group.append(labels["DAL"])
 group.append(labels["SJC"])
 group.append(status_tile)
 group.append(AQILabel)
@@ -240,6 +275,9 @@ def updatesensor(seconds):
 
 def get_time(seconds):
     """ get local time information from from the net and return list of (location, time)"""
+    # reset the offset
+    global offset
+    offset = False
     set_status(status,2,seconds)
     times = {}
     for location, tz in locations.items():
@@ -257,6 +295,39 @@ def get_time(seconds):
     status_color = 0
     set_status(status,status_color,seconds)
     return times
+
+def calcNewOffset(ts, direction):
+    """
+    calculate offset in minutes from existing ts to the next offset
+    if it goes up, then round up to the next :30. if it goes down, round down to the next 30 minutes
+    """
+    curr_min = ts.minute
+    if direction == "UP":
+        if curr_min < 30:
+            return 30 - curr_min
+        elif curr_min == 0:
+            return 30
+        else:
+            return 60 - curr_min
+    elif direction == "DOWN":
+        if curr_min > 30:
+            return 30 - curr_min
+        elif curr_min == 0:
+            return -30
+        else:
+            return - curr_min
+    else:
+        print("Error, needs to be UP or DOWN")
+        return None
+        
+def offsetNow(now,offset):
+    """
+    create new now object and add offset in minutes to it (or substruc, depends on the sign of offset
+    """
+    new_now = {}
+    for location,ts in now.items():
+        new_now[location] = ts + timedelta(minutes=offset)
+    return new_now
 try:
     # initial sensor update
     updatesensor(45)
@@ -273,6 +344,28 @@ try:
     # last will hold the last read for time to manage how often we refresh the seconds
     last = time.monotonic() # start the clock referebce
     while True:
+        buttons = seesaw.digital_read_bulk(button_mask)
+        if not buttons & (1 << BUTTON_X):
+            print("resetting offset")
+            now = get_time(seconds) # refresh the time from the time server
+            offset = False
+        if not buttons & (1 << BUTTON_Y):
+            print("lowering offset")
+            delta = calcNewOffset(now['SJC'], "DOWN")  
+            now = offsetNow(now, delta) 
+            if not offset:
+                offset = True
+                # back to regualr time within 30 seconds
+                second_counter = TIME_FETCH_INTERVAL * 60 - 30
+        if not buttons & (1 << BUTTON_A):
+            print("addding ofset offset")
+            delta = calcNewOffset(now['SJC'], "UP")  
+            now = offsetNow(now, delta) 
+            if not offset:
+                offset = True
+                # back to regualr time within 30 seconds
+                second_counter = TIME_FETCH_INTERVAL * 60 - 30
+
         # hide unhide display based on the up button
         if btn.value == False:
             group.hidden = not group.hidden
@@ -281,10 +374,10 @@ try:
             # check if a second past to update the current time, and check if its time to fetch the time from the net 
             if time.monotonic() - last >= 1:
                 last+=1 # advance the clock referebce
-                # check if 3am in NYC. If so, turn display off
+                # check if 3am in NYC. If so, turn display off, but when in middle of offset, don't hide
                 hours=now["SJC"].hour
                 minutes=now["SJC"].minute
-                if hours == 0 and minutes ==0:
+                if hours == 0 and minutes ==0 and not offset:
                     group.hidden = True
                 if hours == 6 and minutes ==0:
                     group.hidden = False
