@@ -236,6 +236,7 @@ def updateScreen(now, labels):
     """
     Update the matrix screen with time
     """
+    display.auto_refresh = False
     for location, ts in now.items():
         # extract the time, converting 0 to O so the diisplay won't show somethign too similar to 8
         hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
@@ -255,6 +256,8 @@ def updateScreen(now, labels):
             labels[location].text=f"{location} {hours}:{minutes}"
         if labels[location].color != color:
             labels[location].color = color
+    display.refresh()
+    display.auto_refresh = True
 
 
 def updatesensor(seconds): 
@@ -302,18 +305,25 @@ def calcNewOffset(ts, direction):
     if it goes up, then round up to the next :30. if it goes down, round down to the next 30 minutes
     """
     curr_min = ts.minute
-    if direction == "UP":
+    if direction == "UP30":
         if curr_min < 30:
             return 30 - curr_min
         elif curr_min == 0:
             return 30
         else:
             return 60 - curr_min
-    elif direction == "DOWN":
+    elif direction == "DOWN30":
         if curr_min > 30:
             return 30 - curr_min
         elif curr_min == 0:
             return -30
+        else:
+            return - curr_min
+    if direction == "UP60":
+        return 60 - curr_min
+    elif direction == "DOWN60":
+        if curr_min == 0:
+            return - 60
         else:
             return - curr_min
     else:
@@ -345,21 +355,23 @@ try:
     last = time.monotonic() # start the clock referebce
     while True:
         buttons = seesaw.digital_read_bulk(button_mask)
-        if not buttons & (1 << BUTTON_X):
-            print("resetting offset")
+        pressed = False
+        if not buttons & (1 << BUTTON_START):
             now = get_time(seconds) # refresh the time from the time server
             offset = False
         if not buttons & (1 << BUTTON_Y):
-            print("lowering offset")
-            delta = calcNewOffset(now['SJC'], "DOWN")  
-            now = offsetNow(now, delta) 
-            # reseet within two minutes
-            second_counter = TIME_FETCH_INTERVAL * 60 - 120
-            if not offset:
-                offset = True
+            delta = calcNewOffset(now['SJC'], "DOWN30")  
+            pressed = True
         if not buttons & (1 << BUTTON_A):
-            print("addding ofset offset")
-            delta = calcNewOffset(now['SJC'], "UP")  
+            delta = calcNewOffset(now['SJC'], "UP30")  
+            pressed = True
+        if not buttons & (1 << BUTTON_B):
+            delta = calcNewOffset(now['SJC'], "DOWN60")  
+            pressed = True
+        if not buttons & (1 << BUTTON_X):
+            delta = calcNewOffset(now['SJC'], "UP60")  
+            pressed = True
+        if pressed:
             now = offsetNow(now, delta) 
             # reseet within two minutes
             second_counter = TIME_FETCH_INTERVAL * 60 - 120
@@ -413,7 +425,7 @@ try:
                     env_count = 0
 
             # no need to busy loop, enough to check the time every 200 millis 
-            time.sleep(0.2)
+            time.sleep(0.1)
         except RuntimeError as e:
             print("Err", e)
             status_color = 1
