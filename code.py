@@ -1,5 +1,7 @@
 import time
 import board
+import simpleio
+
 from microcontroller import reset
 #import microcontroller
 #from digitalio import DigitalInOut, Direction, Pull
@@ -55,16 +57,6 @@ seesaw = Seesaw(i2c, addr=0x50)
 
 seesaw.pin_mode_bulk(button_mask, seesaw.INPUT_PULLUP)
 
-#setup speaker
-# dac = AudioOut(board.A0)
-#length = 8000 // 800
-#sine_wave = array("H", [0] * length)
-#for i in range(length):
-#    sine_wave[i] = int(sin(pi * 2 * i / length) * (2 ** 15) + 2 ** 15)
-#
-#sine_wave = RawSample(sine_wave) #, sample_rate=8000)
-#playing = False
-
 # setup display
 # bit_depth = 2
 # base_width = 64
@@ -78,23 +70,23 @@ seesaw.pin_mode_bulk(button_mask, seesaw.INPUT_PULLUP)
 
 displayio.release_displays()
 matrix = rgbmatrix.RGBMatrix(
-                width=64,
-                height=64,
-                bit_depth=2,
-                rgb_pins=[
-                    board.MTX_R1,
-                    board.MTX_G1,
-                    board.MTX_B1,
-                    board.MTX_R2,
-                    board.MTX_G2,
-                    board.MTX_B2,
-                ],
-                addr_pins=[board.MTX_ADDRA, board.MTX_ADDRB, board.MTX_ADDRC, board.MTX_ADDRD],
-                clock_pin=board.MTX_CLK,
-                latch_pin=board.MTX_LAT,
-                output_enable_pin=board.MTX_OE,
-                tile=2, serpentine=True,
-            )
+        width=64,
+        height=64,
+        bit_depth=2,
+        rgb_pins=[
+            board.MTX_R1,
+            board.MTX_G1,
+            board.MTX_B1,
+            board.MTX_R2,
+            board.MTX_G2,
+            board.MTX_B2,
+            ],
+        addr_pins=[board.MTX_ADDRA, board.MTX_ADDRB, board.MTX_ADDRC, board.MTX_ADDRD],
+        clock_pin=board.MTX_CLK,
+        latch_pin=board.MTX_LAT,
+        output_enable_pin=board.MTX_OE,
+        tile=2, serpentine=True,
+        )
 display = framebufferio.FramebufferDisplay(matrix)
 
 #init button
@@ -385,7 +377,7 @@ try:
         pre_buttons = buttons
 
         # hide unhide display based on the up button
-        if btn.value == False:
+        if btn.value == False or (not buttons & (1 << BUTTON_SELECT)):
             group.hidden = not group.hidden
 
         try:
@@ -410,7 +402,12 @@ try:
                 else:
                     for location, ts in now.items():
                         now[location] += timedelta(seconds = 1)
-                
+               
+                # beep if time is x:29 or x:59
+                if seconds == 0 and minutes in [29,59]:
+                    simpleio.tone(board.A0,340,0.1)
+                    simpleio.tone(board.A0,340,0.1)
+
                 #update screen
                 updateScreen(now, labels)
                 # print debug info
