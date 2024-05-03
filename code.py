@@ -1,6 +1,6 @@
 import time
 import board
-import simpleio
+#import simpleio
 
 from microcontroller import reset
 #import microcontroller
@@ -34,6 +34,8 @@ TIME_FETCH_INTERVAL = 20
 ENV_REFRESH_INTERVAL = 1
 
 i2c = board.STEMMA_I2C()
+#simpleio.tone(board.A0,340,0.1)
+#simpleio.tone(board.A0,340,0.1)
 
 # setup joystick
 BUTTON_X = const(6)
@@ -51,11 +53,9 @@ button_mask = const(
     | (1 << BUTTON_START)
 )
 
-# i2c_bus = board.I2C()  # Uses board.SCL and board.SDA. Use with breadboard.
+#i2c_bus = board.I2C()  # Uses board.SCL and board.SDA. Use with breadboard.
+print("start")
 
-seesaw = Seesaw(i2c, addr=0x50)
-
-seesaw.pin_mode_bulk(button_mask, seesaw.INPUT_PULLUP)
 
 # setup display
 # bit_depth = 2
@@ -89,10 +89,6 @@ matrix = rgbmatrix.RGBMatrix(
         )
 display = framebufferio.FramebufferDisplay(matrix)
 
-#init button
-btn = DigitalInOut(board.BUTTON_UP )
-btn.direction = Direction.INPUT
-btn.pull = Pull.UP
 #setup graphics
 #matrix = Matrix()
 #display = matrix.display
@@ -209,7 +205,6 @@ group.append(status_tile)
 group.append(AQILabel)
 display.root_group = group
 
-display.auto_refresh = False
 
 def get_color(hour_in):
     """ Return a color based on hour of the day to show different colors:
@@ -230,6 +225,7 @@ def updateScreen(now, labels):
     """
     Update the matrix screen with time
     """
+    display.auto_refresh = False
     for location, ts in now.items():
         # extract the time, converting 0 to O so the diisplay won't show somethign too similar to 8
         hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
@@ -249,7 +245,7 @@ def updateScreen(now, labels):
             labels[location].color = color
     # blink the status
     status_tile.hidden = not status_tile.hidden
-    display.refresh()
+    display.auto_refresh = True
 
 
 def updatesensor(seconds): 
@@ -334,6 +330,12 @@ def offsetNow(now,offset):
 try:
     # initial sensor update
     updatesensor(45)
+    #init buttons
+    seesaw = Seesaw(i2c, addr=0x50)
+    seesaw.pin_mode_bulk(button_mask, seesaw.INPUT_PULLUP)
+    btn = DigitalInOut(board.BUTTON_UP )
+    btn.direction = Direction.INPUT
+    btn.pull = Pull.UP
     # `now` holds the local time for all locations
     now = get_time(45)
     # display the updated times
@@ -404,7 +406,7 @@ try:
                         now[location] += timedelta(seconds = 1)
                
                 # beep if time is x:29 or x:59
-                if seconds == 0 and minutes in [29,59]:
+                if seconds == 0 and minutes in [29,59] and hours in range(7,20):
                     simpleio.tone(board.A0,340,0.1)
                     simpleio.tone(board.A0,340,0.1)
 
