@@ -280,7 +280,11 @@ def get_time(seconds):
         res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
         if res:
             # get the returned timestamp ISO format and add a second
-            times[location] = datetime.fromisoformat(res.json()['datetime'])
+            try:
+                times[location] = datetime.fromisoformat(res.json()['datetime'])
+            except ValueError:
+                print('error parsing jason')
+                print(res.text)
         else:
             print("Error", res.status_code, res.text)
             raise RuntimeError
@@ -407,8 +411,9 @@ try:
                
                 # beep if time is x:29 or x:59
                 if seconds == 0 and minutes in [29,59] and hours in range(7,20):
-                    simpleio.tone(board.A0,340,0.1)
-                    simpleio.tone(board.A0,340,0.1)
+                    pass
+                    #simpleio.tone(board.A0,340,0.1)
+                    #simpleio.tone(board.A0,340,0.1)
 
                 #update screen
                 updateScreen(now, labels)
@@ -430,7 +435,7 @@ try:
                     env_count = 0
 
             # no need to busy loop, enough to check the time every 200 millis 
-            time.sleep(0.05)
+            time.sleep(0.1)
         except RuntimeError as e:
             print("Err", e)
             status_color = 1
