@@ -235,6 +235,8 @@ def updateScreen(now, labels):
         else:
             sep = '-'
         hours,minutes,seconds=now[location].isoformat().split('T')[1].split(sep)[0].split(':')
+        hours = hours.replace('0', 'O')
+        minutes = minutes.replace('0', 'O')
         seconds = now[location].second
         # get the color based on daytime. the functions can't cope with O so translate back to 0
         color = get_color(hours.replace("O","0"))
