@@ -1,7 +1,7 @@
 import time
 import board
 #import simpleio
-
+import secrets
 from microcontroller import reset
 #import microcontroller
 #from digitalio import DigitalInOut, Direction, Pull
@@ -27,12 +27,14 @@ from audiocore import RawSample
 #from array import array
 #from math import sin, pi
 from adafruit_seesaw.seesaw import Seesaw
-from micropython import const
+from micropython import const # type: ignore
 
 DEBUG=True
-TIME_FETCH_INTERVAL = 20
+TIME_FETCH_INTERVAL = 120
 ENV_REFRESH_INTERVAL = 1
 
+aio_username = secrets.ADAFRUIT_AIO_USERNAME
+aio_key = secrets.ADAFRUIT_AIO_KEY
 i2c = board.STEMMA_I2C()
 #simpleio.tone(board.A0,340,0.1)
 #simpleio.tone(board.A0,340,0.1)
@@ -228,7 +230,11 @@ def updateScreen(now, labels):
     display.auto_refresh = False
     for location, ts in now.items():
         # extract the time, converting 0 to O so the diisplay won't show somethign too similar to 8
-        hours,minutes,seconds=now[location].isoformat().split('T')[1].split('.')[0].replace("0","O").split(':')
+        if '+' in now[location].isoformat():
+            sep = '+'
+        else:
+            sep = '-'
+        hours,minutes,seconds=now[location].isoformat().split('T')[1].split(sep)[0].split(':')
         seconds = now[location].second
         # get the color based on daytime. the functions can't cope with O so translate back to 0
         color = get_color(hours.replace("O","0"))
@@ -276,18 +282,23 @@ def get_time(seconds):
         # use REST API to get the time at the time zone
         # free memory before fetching and pring free memory otherwise from time to time we will run out of memory 
         gc.collect()
+        TIME_URL = f"https://io.adafruit.com/api/v2/{aio_username}/integrations/time/clock?x-aio-key={aio_key}&tz={tz}"
+        #TIME_URL += "&fmt=%25Y-%25m-%25d+%25H%3A%25M%3A%25S.%25L+%25j+%25u+%25z+%25Z"   
+        res = network.fetch(TIME_URL)
+        print(tz, res.text)
         # print(gc.mem_free())
-        res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
+        # res = network.fetch("http://worldtimeapi.org/api/timezone/"+tz)
         if res:
-            # get the returned timestamp ISO format and add a second
-            try:
-                times[location] = datetime.fromisoformat(res.json()['datetime'])
-            except ValueError:
-                print('error parsing jason')
-                print(res.text)
+             # get the returned timestamp ISO format and add a second
+             try:
+                 #times[location] = datetime.fromisoformat(res.json()['datetime'])
+                 times[location] = datetime.fromisoformat(res.text.replace('Z', ''))
+             except ValueError:
+                 print('error parsing jason')
+                 print(res.text)
         else:
-            print("Error", res.status_code, res.text)
-            raise RuntimeError
+             print("Error", res.status_code, res.text)
+             raise RuntimeError
     status_color = 0
     set_status(status,status_color,seconds)
     return times
